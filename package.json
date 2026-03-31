@@ -1,0 +1,27 @@
+{
+  "name": "n8n-nodes-icloud-contacts",
+  "version": "1.0.0",
+  "description": "n8n node to fetch contacts from iCloud via CardDAV",
+  "license": "MIT",
+  "author": "Nicola Bonzanni",
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "nodes": [
+      "dist/nodes/ICloudContacts/ICloudContacts.node.js"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "n8n-workflow": "*",
+    "typescript": "~5.3.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
