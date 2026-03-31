@@ -51,7 +51,6 @@ class ICloudContacts {
         const password = credentials.password;
         const authHeader = 'Basic ' + Buffer.from(`${user}:${password}`).toString('base64');
         const davRequest = async (method, url, body, depth) => {
-            var _a;
             const response = await this.helpers.httpRequest({
                 method: method,
                 url,
@@ -61,19 +60,11 @@ class ICloudContacts {
                     'Content-Type': 'application/xml; charset=utf-8',
                 },
                 body,
-                returnFullResponse: true,
-                ignoreHttpStatusErrors: true,
             });
-            const statusCode = (_a = response === null || response === void 0 ? void 0 : response.statusCode) !== null && _a !== void 0 ? _a : response === null || response === void 0 ? void 0 : response.status;
-            const responseBody = typeof response === 'string'
-                ? response
-                : typeof (response === null || response === void 0 ? void 0 : response.body) === 'string'
-                    ? response.body
-                    : JSON.stringify(response);
-            if (statusCode === 401 || statusCode === 403) {
-                throw new n8n_workflow_1.NodeOperationError(this.getNode(), `iCloud authentication failed (HTTP ${statusCode}). Check your Apple ID and app-specific password.`);
-            }
-            return responseBody;
+            // httpRequest returns the body directly (string for XML responses)
+            if (typeof response === 'string')
+                return response;
+            return JSON.stringify(response);
         };
         // --- Step 1: PROPFIND / on contacts.icloud.com to get principal path ---
         const step1Body = await davRequest('PROPFIND', 'https://contacts.icloud.com/', '<?xml version="1.0" encoding="UTF-8"?>' +

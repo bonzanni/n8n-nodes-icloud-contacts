@@ -64,25 +64,11 @@ export class ICloudContacts implements INodeType {
 					'Content-Type': 'application/xml; charset=utf-8',
 				},
 				body,
-				returnFullResponse: true,
-				ignoreHttpStatusErrors: true,
 			});
 
-			const statusCode = response?.statusCode ?? response?.status;
-			const responseBody: string = typeof response === 'string'
-				? response
-				: typeof response?.body === 'string'
-					? response.body
-					: JSON.stringify(response);
-
-			if (statusCode === 401 || statusCode === 403) {
-				throw new NodeOperationError(
-					this.getNode(),
-					`iCloud authentication failed (HTTP ${statusCode}). Check your Apple ID and app-specific password.`,
-				);
-			}
-
-			return responseBody;
+			// httpRequest returns the body directly (string for XML responses)
+			if (typeof response === 'string') return response;
+			return JSON.stringify(response);
 		};
 
 		// --- Step 1: PROPFIND / on contacts.icloud.com to get principal path ---
