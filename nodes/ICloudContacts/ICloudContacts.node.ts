@@ -48,7 +48,7 @@ export class ICloudContacts implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'iCloud Contacts',
 		name: 'iCloudContacts',
-		icon: 'file:iCloudContacts.svg',
+		icon: 'fa:address-book',
 		group: ['transform'],
 		version: 1,
 		subtitle: 'Get All Contacts',
