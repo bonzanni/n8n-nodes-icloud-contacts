@@ -43,7 +43,7 @@ class ICloudContacts {
         };
     }
     async execute() {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b;
         const returnData = [];
         // --- Step 1: PROPFIND / on contacts.icloud.com to get principal path ---
         const propfindPrincipalBody = '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -70,13 +70,18 @@ class ICloudContacts {
         }
         const step1Body = typeof step1Response === 'string'
             ? step1Response
-            : ((_a = step1Response.body) !== null && _a !== void 0 ? _a : step1Response);
-        // Extract principal path from <d:href> inside <d:current-user-principal>
-        const principalMatch = step1Body.match(/<d:current-user-principal[\s\S]*?<d:href>([^<]+)<\/d:href>/i);
-        // Also try without namespace prefix (some responses use <D:href> or <href>)
-        const principalPath = (_d = (_b = principalMatch === null || principalMatch === void 0 ? void 0 : principalMatch[1]) !== null && _b !== void 0 ? _b : (_c = step1Body.match(/<current-user-principal[\s\S]*?<href>([^<]+)<\/href>/i)) === null || _c === void 0 ? void 0 : _c[1]) !== null && _d !== void 0 ? _d : (_e = step1Body.match(/<D:current-user-principal[\s\S]*?<D:href>([^<]+)<\/D:href>/i)) === null || _e === void 0 ? void 0 : _e[1];
+            : typeof (step1Response === null || step1Response === void 0 ? void 0 : step1Response.body) === 'string'
+                ? step1Response.body
+                : JSON.stringify(step1Response);
+        // Check for HTTP errors in full response
+        const step1Status = (_a = step1Response === null || step1Response === void 0 ? void 0 : step1Response.statusCode) !== null && _a !== void 0 ? _a : step1Response === null || step1Response === void 0 ? void 0 : step1Response.status;
+        if (step1Status && (step1Status === 401 || step1Status === 403)) {
+            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `iCloud authentication failed (HTTP ${step1Status}). Check your Apple ID and app-specific password.`);
+        }
+        // Extract principal path — handle any namespace prefix (d:, D:, or none)
+        const principalPath = (_b = step1Body.match(/<[^>]*current-user-principal[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i)) === null || _b === void 0 ? void 0 : _b[1];
         if (!principalPath) {
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Could not find current-user-principal in iCloud response. Check your credentials (Apple ID + app-specific password).');
+            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find current-user-principal in iCloud response. Status: ${step1Status !== null && step1Status !== void 0 ? step1Status : 'unknown'}. Response (first 500 chars): ${step1Body.substring(0, 500)}`);
         }
         // --- Step 2: PROPFIND principal path to get addressbook-home-set ---
         const propfindHomeBody = '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -103,12 +108,14 @@ class ICloudContacts {
         }
         const step2Body = typeof step2Response === 'string'
             ? step2Response
-            : ((_f = step2Response.body) !== null && _f !== void 0 ? _f : step2Response);
-        // addressbook-home-set contains a full URL on a potentially different host
-        const homeMatch = (_g = step2Body.match(/<(?:card:)?addressbook-home-set[\s\S]*?<d:href>([^<]+)<\/d:href>/i)) !== null && _g !== void 0 ? _g : step2Body.match(/<(?:C:)?addressbook-home-set[\s\S]*?<(?:D:)?href>([^<]+)<\/(?:D:)?href>/i);
+            : typeof (step2Response === null || step2Response === void 0 ? void 0 : step2Response.body) === 'string'
+                ? step2Response.body
+                : JSON.stringify(step2Response);
+        // Extract addressbook-home-set — handle any namespace prefix
+        const homeMatch = step2Body.match(/<[^>]*addressbook-home-set[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i);
         let addressbookHome = homeMatch === null || homeMatch === void 0 ? void 0 : homeMatch[1];
         if (!addressbookHome) {
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Could not find addressbook-home-set in iCloud response.');
+            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find addressbook-home-set. Response (first 500 chars): ${step2Body.substring(0, 500)}`);
         }
         // If it's a full URL, use as-is. If relative, prepend host.
         if (!addressbookHome.startsWith('http')) {
@@ -145,7 +152,9 @@ class ICloudContacts {
         }
         const step3Body = typeof step3Response === 'string'
             ? step3Response
-            : ((_h = step3Response.body) !== null && _h !== void 0 ? _h : step3Response);
+            : typeof (step3Response === null || step3Response === void 0 ? void 0 : step3Response.body) === 'string'
+                ? step3Response.body
+                : JSON.stringify(step3Response);
         // Extract all vCards from <card:address-data> or <address-data> elements
         const vcardPattern = /<(?:card:)?address-data[^>]*>([\s\S]*?)<\/(?:card:)?address-data>/gi;
         let vcardMatch;
