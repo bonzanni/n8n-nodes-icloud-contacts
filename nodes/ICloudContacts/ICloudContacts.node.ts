@@ -4,7 +4,6 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	NodeOperationError,
-	IHttpRequestOptions,
 } from 'n8n-workflow';
 
 export class ICloudContacts implements INodeType {
@@ -49,24 +48,26 @@ export class ICloudContacts implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const returnData: INodeExecutionData[] = [];
 
+		// Get credentials and build auth header manually.
+		// httpRequestWithAuthentication strips auth on iCloud's cross-host redirects,
+		// so we inject the Authorization header directly on every request.
+		const credentials = await this.getCredentials('httpBasicAuth');
+		const user = credentials.user as string;
+		const password = credentials.password as string;
+		const authHeader = 'Basic ' + Buffer.from(`${user}:${password}`).toString('base64');
+
 		const davRequest = async (method: string, url: string, body: string, depth: string): Promise<string> => {
-			const options: IHttpRequestOptions = {
+			const response = await this.helpers.httpRequest({
 				method: method as any,
 				url,
 				headers: {
+					Authorization: authHeader,
 					Depth: depth,
 					'Content-Type': 'application/xml; charset=utf-8',
 				},
 				body,
-			};
+			});
 
-			const response = await this.helpers.httpRequestWithAuthentication.call(
-				this,
-				'httpBasicAuth',
-				options,
-			);
-
-			// Without returnFullResponse, n8n returns the body directly
 			if (typeof response === 'string') return response;
 			return JSON.stringify(response);
 		};
@@ -97,7 +98,7 @@ export class ICloudContacts implements INodeType {
 		if (!principalPath) {
 			throw new NodeOperationError(
 				this.getNode(),
-				`Could not find current-user-principal. Response (first 1000 chars): ${step1Body.substring(0, 1000)}`,
+				`Could not find current-user-principal. Response (first 2000 chars): ${step1Body.substring(0, 2000)}`,
 			);
 		}
 
@@ -131,7 +132,7 @@ export class ICloudContacts implements INodeType {
 			);
 		}
 
-		// If relative path, prepend host
+		// addressbook-home-set may return a full URL on a different host — use as-is
 		if (!addressbookHome.startsWith('http')) {
 			addressbookHome = `https://contacts.icloud.com${addressbookHome}`;
 		}

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-icloud-contacts",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "n8n node to fetch contacts from iCloud via CardDAV",
   "license": "MIT",
   "author": "Nicola Bonzanni",

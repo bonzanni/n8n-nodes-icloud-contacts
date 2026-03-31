@@ -45,18 +45,24 @@ class ICloudContacts {
     async execute() {
         var _a, _b;
         const returnData = [];
+        // Get credentials and build auth header manually.
+        // httpRequestWithAuthentication strips auth on iCloud's cross-host redirects,
+        // so we inject the Authorization header directly on every request.
+        const credentials = await this.getCredentials('httpBasicAuth');
+        const user = credentials.user;
+        const password = credentials.password;
+        const authHeader = 'Basic ' + Buffer.from(`${user}:${password}`).toString('base64');
         const davRequest = async (method, url, body, depth) => {
-            const options = {
+            const response = await this.helpers.httpRequest({
                 method: method,
                 url,
                 headers: {
+                    Authorization: authHeader,
                     Depth: depth,
                     'Content-Type': 'application/xml; charset=utf-8',
                 },
                 body,
-            };
-            const response = await this.helpers.httpRequestWithAuthentication.call(this, 'httpBasicAuth', options);
-            // Without returnFullResponse, n8n returns the body directly
+            });
             if (typeof response === 'string')
                 return response;
             return JSON.stringify(response);
@@ -74,7 +80,7 @@ class ICloudContacts {
         }
         const principalPath = (_a = step1Body.match(/<[^>]*current-user-principal[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i)) === null || _a === void 0 ? void 0 : _a[1];
         if (!principalPath) {
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find current-user-principal. Response (first 1000 chars): ${step1Body.substring(0, 1000)}`);
+            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find current-user-principal. Response (first 2000 chars): ${step1Body.substring(0, 2000)}`);
         }
         // --- Step 2: PROPFIND principal path to get addressbook-home-set ---
         let step2Body;
@@ -91,7 +97,7 @@ class ICloudContacts {
         if (!addressbookHome) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find addressbook-home-set. Response (first 2000 chars): ${step2Body.substring(0, 2000)}`);
         }
-        // If relative path, prepend host
+        // addressbook-home-set may return a full URL on a different host — use as-is
         if (!addressbookHome.startsWith('http')) {
             addressbookHome = `https://contacts.icloud.com${addressbookHome}`;
         }
