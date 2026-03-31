@@ -35,7 +35,7 @@ class ICloudContacts {
         this.description = {
             displayName: 'iCloud Contacts',
             name: 'iCloudContacts',
-            icon: 'fa:address-book',
+            icon: 'file:ICloudContacts.svg',
             group: ['transform'],
             version: 1,
             subtitle: 'Get All Contacts',
