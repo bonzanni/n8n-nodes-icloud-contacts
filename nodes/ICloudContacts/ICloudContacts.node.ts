@@ -4,6 +4,7 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	NodeOperationError,
+	IHttpRequestOptions,
 } from 'n8n-workflow';
 
 export class ICloudContacts implements INodeType {
@@ -48,39 +49,46 @@ export class ICloudContacts implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const returnData: INodeExecutionData[] = [];
 
-		// Build Basic auth header manually so it survives iCloud's redirects
-		const credentials = await this.getCredentials('httpBasicAuth');
-		const user = credentials.user as string;
-		const password = credentials.password as string;
-		const authHeader = 'Basic ' + Buffer.from(`${user}:${password}`).toString('base64');
-
 		const davRequest = async (method: string, url: string, body: string, depth: string): Promise<string> => {
-			const response = await this.helpers.httpRequest({
+			const options: IHttpRequestOptions = {
 				method: method as any,
 				url,
 				headers: {
-					Authorization: authHeader,
 					Depth: depth,
 					'Content-Type': 'application/xml; charset=utf-8',
 				},
 				body,
-			});
+			};
 
-			// httpRequest returns the body directly (string for XML responses)
+			const response = await this.helpers.httpRequestWithAuthentication.call(
+				this,
+				'httpBasicAuth',
+				options,
+			);
+
+			// Without returnFullResponse, n8n returns the body directly
 			if (typeof response === 'string') return response;
 			return JSON.stringify(response);
 		};
 
 		// --- Step 1: PROPFIND / on contacts.icloud.com to get principal path ---
-		const step1Body = await davRequest(
-			'PROPFIND',
-			'https://contacts.icloud.com/',
-			'<?xml version="1.0" encoding="UTF-8"?>' +
-			'<d:propfind xmlns:d="DAV:">' +
-			'<d:prop><d:current-user-principal/></d:prop>' +
-			'</d:propfind>',
-			'0',
-		);
+		let step1Body: string;
+		try {
+			step1Body = await davRequest(
+				'PROPFIND',
+				'https://contacts.icloud.com/',
+				'<?xml version="1.0" encoding="UTF-8"?>' +
+				'<d:propfind xmlns:d="DAV:">' +
+				'<d:prop><d:current-user-principal/></d:prop>' +
+				'</d:propfind>',
+				'0',
+			);
+		} catch (error: any) {
+			throw new NodeOperationError(
+				this.getNode(),
+				`Failed to connect to iCloud: ${error.message}. Check your Apple ID and app-specific password.`,
+			);
+		}
 
 		const principalPath = step1Body.match(
 			/<[^>]*current-user-principal[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i,
@@ -89,20 +97,28 @@ export class ICloudContacts implements INodeType {
 		if (!principalPath) {
 			throw new NodeOperationError(
 				this.getNode(),
-				`Could not find current-user-principal. Response (first 500 chars): ${step1Body.substring(0, 500)}`,
+				`Could not find current-user-principal. Response (first 1000 chars): ${step1Body.substring(0, 1000)}`,
 			);
 		}
 
 		// --- Step 2: PROPFIND principal path to get addressbook-home-set ---
-		const step2Body = await davRequest(
-			'PROPFIND',
-			`https://contacts.icloud.com${principalPath}`,
-			'<?xml version="1.0" encoding="UTF-8"?>' +
-			'<d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">' +
-			'<d:prop><card:addressbook-home-set/></d:prop>' +
-			'</d:propfind>',
-			'0',
-		);
+		let step2Body: string;
+		try {
+			step2Body = await davRequest(
+				'PROPFIND',
+				`https://contacts.icloud.com${principalPath}`,
+				'<?xml version="1.0" encoding="UTF-8"?>' +
+				'<d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">' +
+				'<d:prop><card:addressbook-home-set/></d:prop>' +
+				'</d:propfind>',
+				'0',
+			);
+		} catch (error: any) {
+			throw new NodeOperationError(
+				this.getNode(),
+				`Failed to get addressbook-home-set: ${error.message}`,
+			);
+		}
 
 		let addressbookHome = step2Body.match(
 			/<[^>]*addressbook-home-set[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i,
@@ -111,7 +127,7 @@ export class ICloudContacts implements INodeType {
 		if (!addressbookHome) {
 			throw new NodeOperationError(
 				this.getNode(),
-				`Could not find addressbook-home-set. Response (first 500 chars): ${step2Body.substring(0, 500)}`,
+				`Could not find addressbook-home-set. Response (first 2000 chars): ${step2Body.substring(0, 2000)}`,
 			);
 		}
 
@@ -126,15 +142,23 @@ export class ICloudContacts implements INodeType {
 		// --- Step 3: REPORT on {home}card/ to get all vCards ---
 		const cardCollectionUrl = `${addressbookHome}card/`;
 
-		const step3Body = await davRequest(
-			'REPORT',
-			cardCollectionUrl,
-			'<?xml version="1.0" encoding="UTF-8"?>' +
-			'<card:addressbook-query xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">' +
-			'<d:prop><d:getetag/><card:address-data/></d:prop>' +
-			'</card:addressbook-query>',
-			'1',
-		);
+		let step3Body: string;
+		try {
+			step3Body = await davRequest(
+				'REPORT',
+				cardCollectionUrl,
+				'<?xml version="1.0" encoding="UTF-8"?>' +
+				'<card:addressbook-query xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">' +
+				'<d:prop><d:getetag/><card:address-data/></d:prop>' +
+				'</card:addressbook-query>',
+				'1',
+			);
+		} catch (error: any) {
+			throw new NodeOperationError(
+				this.getNode(),
+				`Failed to fetch contacts: ${error.message}`,
+			);
+		}
 
 		// Extract all vCards from <card:address-data> or <address-data> elements
 		const vcardPattern = /<(?:card:)?address-data[^>]*>([\s\S]*?)<\/(?:card:)?address-data>/gi;
