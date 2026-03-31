@@ -92,7 +92,7 @@ export class ICloudContacts implements INodeType {
 		}
 
 		const principalPath = step1Body.match(
-			/<[^>]*current-user-principal[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i,
+			/<[^>]*current-user-principal[^>]*>[\s\S]*?<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/i,
 		)?.[1];
 
 		if (!principalPath) {
@@ -122,7 +122,7 @@ export class ICloudContacts implements INodeType {
 		}
 
 		let addressbookHome = step2Body.match(
-			/<[^>]*addressbook-home-set[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i,
+			/<[^>]*addressbook-home-set[^>]*>[\s\S]*?<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/i,
 		)?.[1];
 
 		if (!addressbookHome) {

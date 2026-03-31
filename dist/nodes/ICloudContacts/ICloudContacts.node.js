@@ -78,7 +78,7 @@ class ICloudContacts {
         catch (error) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Failed to connect to iCloud: ${error.message}. Check your Apple ID and app-specific password.`);
         }
-        const principalPath = (_a = step1Body.match(/<[^>]*current-user-principal[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i)) === null || _a === void 0 ? void 0 : _a[1];
+        const principalPath = (_a = step1Body.match(/<[^>]*current-user-principal[^>]*>[\s\S]*?<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/i)) === null || _a === void 0 ? void 0 : _a[1];
         if (!principalPath) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find current-user-principal. Response (first 2000 chars): ${step1Body.substring(0, 2000)}`);
         }
@@ -93,7 +93,7 @@ class ICloudContacts {
         catch (error) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Failed to get addressbook-home-set: ${error.message}`);
         }
-        let addressbookHome = (_b = step2Body.match(/<[^>]*addressbook-home-set[\s\S]*?<[^>]*href>([^<]+)<\/[^>]*href>/i)) === null || _b === void 0 ? void 0 : _b[1];
+        let addressbookHome = (_b = step2Body.match(/<[^>]*addressbook-home-set[^>]*>[\s\S]*?<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/i)) === null || _b === void 0 ? void 0 : _b[1];
         if (!addressbookHome) {
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Could not find addressbook-home-set. Response (first 2000 chars): ${step2Body.substring(0, 2000)}`);
         }
